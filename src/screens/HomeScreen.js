@@ -1,6 +1,8 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+    Linking,
+    Platform,
     StyleSheet,
     Text,
     TextInput,
@@ -14,12 +16,43 @@ import { generatePassword } from "../utils/passwordGenerator";
 export default function HomeScreen() {
   const [password, setPassword] = useState("");
   const [visible, setVisible] = useState(false);
+  const [installable, setInstallable] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
 
   const result = analyzePassword(password);
 
   const handleGenerate = () => {
     setPassword(generatePassword(16));
     setVisible(true);
+  };
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined")
+      return undefined;
+
+    const onBeforeInstallPrompt = (event) => {
+      event.preventDefault();
+      setDeferredPrompt(event);
+      setInstallable(true);
+    };
+
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+
+    return () =>
+      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) return;
+
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    setDeferredPrompt(null);
+    setInstallable(false);
+  };
+
+  const handleDownloadApk = () => {
+    Linking.openURL("https://github.com/marco-maker-aourse/password/releases");
   };
 
   const getBarColor = () => {
@@ -71,6 +104,23 @@ export default function HomeScreen() {
         >
           <Text style={styles.generateText}>Generar contraseña segura</Text>
         </TouchableOpacity>
+
+        <View style={styles.actionRow}>
+          {installable ? (
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={handleInstall}
+            >
+              <Text style={styles.secondaryText}>Instalar app</Text>
+            </TouchableOpacity>
+          ) : null}
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={handleDownloadApk}
+          >
+            <Text style={styles.secondaryText}>Descargar APK</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.metaRow}>
           <Text style={styles.metaChip}>
@@ -204,6 +254,27 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontWeight: "800",
     fontSize: 14,
+  },
+  actionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 8,
+    marginBottom: 12,
+  },
+  secondaryButton: {
+    flex: 1,
+    minWidth: 140,
+    backgroundColor: "#eef2ff",
+    borderRadius: 14,
+    paddingVertical: 10,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#c7d2fe",
+  },
+  secondaryText: {
+    color: "#3730a3",
+    fontWeight: "800",
   },
   metaRow: {
     flexDirection: "row",
